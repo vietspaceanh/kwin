@@ -6,6 +6,7 @@
 
 #include "renderloop.h"
 #include "backendoutput.h"
+#include "effect/effecthandler.h"
 #include "options.h"
 #include "renderloop_p.h"
 #include "scene/surfaceitem.h"
@@ -259,7 +260,8 @@ void RenderLoop::scheduleRepaint(Item *item, OutputLayer *outputLayer)
     const bool tearing = d->presentationMode == PresentationMode::Async || d->presentationMode == PresentationMode::AdaptiveAsync;
     if ((vrr || tearing) && (item || outputLayer) && activeWindowControlsVrrRefreshRate() && d->output) {
         SurfaceItem *const surfaceItem = workspace()->activeWindow()->surfaceItem();
-        if (item != surfaceItem && !surfaceItem->isAncestorOf(item)) {
+        if (item && item != surfaceItem && !surfaceItem->isAncestorOf(item) && activeWindowControlsVrrRefreshRate()
+            && !(effects && effects->hasActiveFullScreenEffect())) {
             constexpr std::chrono::milliseconds s_delayVrrTimer = 1'000ms / 30;
             d->delayedVrrTimer.start(s_delayVrrTimer, Qt::PreciseTimer, this);
             return;

@@ -714,7 +714,8 @@ void Compositor::composite(RenderLoop *renderLoop)
     frame->setContentType(activeWindow && activeFullscreenItem ? activeFullscreenItem->contentType() : ContentType::None);
 
     const bool wantsAdaptiveSync = activeWindow && activeWindow->frameGeometry().intersects(primaryView->viewport()) && activeWindow->wantsAdaptiveSync();
-    const bool vrr = (output->capabilities() & BackendOutput::Capability::Vrr) && (output->vrrPolicy() == VrrPolicy::Always || (output->vrrPolicy() == VrrPolicy::Automatic && wantsAdaptiveSync));
+    const bool hasFullScreenEffect = effects && effects->hasActiveFullScreenEffect();
+    const bool vrr = (output->capabilities() & BackendOutput::Capability::Vrr) && (output->vrrPolicy() == VrrPolicy::Always || (output->vrrPolicy() == VrrPolicy::Automatic && wantsAdaptiveSync && !hasFullScreenEffect));
     const bool tearing = (output->capabilities() & BackendOutput::Capability::Tearing) && options->allowTearing() && activeFullscreenItem && activeWindow->wantsTearing(isTearingRequested(activeFullscreenItem));
     if (vrr) {
         frame->setPresentationMode(tearing ? PresentationMode::AdaptiveAsync : PresentationMode::AdaptiveSync);
