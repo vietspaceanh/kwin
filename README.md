@@ -12,9 +12,15 @@ However, the second approach has its own issue. When triggering fullscreen anima
 
 ## The Fix
 
-VRR is disabled during fullscreen effects because the effect controls timing, not the window. Two changes are made:
+VRR is disabled during fullscreen effects because the effect controls timing, not the window.
 
-1. **`src/compositor.cpp`**: Add `hasFullScreenEffect` check to the VRR policy condition, so VRR is not activated when a fullscreen effect is active.
+Apart from Adaptive Sync, running Firefox in XWayland further improves scrolling smoothness. However, it can cause cursor stutter. Therefore, cursor updates are updated to never be throttled by VRR to ensure fluid movement at all times.
+
+### Changes made:
+
+1. **`src/compositor.cpp`**: Add `hasFullScreenEffect` check to the VRR policy condition, so VRR is not activated when a fullscreen effect is active. Also removes VRR delay for hardware cursor plane updates so the cursor presents immediately.
+
+2.  **`src/core/renderloop.cpp`**: Skip VRR delay for fullscreen repaints during active effects and bypassed the 30fps throttle for cursor-related repaints to resolve XWayland cursor stutter.
 
  * IRC: #kde-kwin on irc.libera.chat
  * Matrix: [#kwin:kde.org](https://go.kde.org/matrix/#/#kwin:kde.org)

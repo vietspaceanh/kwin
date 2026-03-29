@@ -9,6 +9,7 @@
 #include "effect/effecthandler.h"
 #include "options.h"
 #include "renderloop_p.h"
+#include "scene/cursoritem.h"
 #include "scene/surfaceitem.h"
 #include "utils/common.h"
 #include "window.h"
@@ -260,8 +261,16 @@ void RenderLoop::scheduleRepaint(Item *item, OutputLayer *outputLayer)
     const bool tearing = d->presentationMode == PresentationMode::Async || d->presentationMode == PresentationMode::AdaptiveAsync;
     if ((vrr || tearing) && (item || outputLayer) && activeWindowControlsVrrRefreshRate() && d->output) {
         SurfaceItem *const surfaceItem = workspace()->activeWindow()->surfaceItem();
-        if (item && item != surfaceItem && !surfaceItem->isAncestorOf(item) && activeWindowControlsVrrRefreshRate()
-            && !(effects && effects->hasActiveFullScreenEffect())) {
+        const bool isCursorRepaint = [&]() {
+            for (auto *i = item; i; i = i->parentItem()) {
+                if (qobject_cast<CursorItem *>(i)) {
+                    return true;
+                }
+            }
+            return false;
+        }();
+        if (item && surfaceItem && item != surfaceItem && !surfaceItem->isAncestorOf(item) && !item->isAncestorOf(surfaceItem)
+            && activeWindowControlsVrrRefreshRate() && !(effects && effects->hasActiveFullScreenEffect()) && !isCursorRepaint) {
             constexpr std::chrono::milliseconds s_delayVrrTimer = 1'000ms / 30;
             d->delayedVrrTimer.start(s_delayVrrTimer, Qt::PreciseTimer, this);
             return;
