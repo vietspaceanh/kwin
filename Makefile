@@ -8,7 +8,7 @@ SYSTEM_KWIN := /usr/bin/kwin_wayland
 BACKUP_KWIN := /usr/bin/kwin_wayland.orig
 BACKUP_LIB  := /usr/lib/libkwin.so.orig
 
-.PHONY: build install revert status clean help
+.PHONY: build install revert status clean upgrade help
 
 help:
 	@echo "KWin Patch Manager"
@@ -17,6 +17,7 @@ help:
 	@echo "  make install  - Install patched KWin (backups original first)"
 	@echo "  make revert   - Restore original system KWin"
 	@echo "  make status   - Show current status"
+	@echo "  make upgrade  - Rebase patch onto new kwin version (usage: make upgrade [VER=6.7.3])"
 	@echo "  make clean    - Remove build directory"
 
 build:
@@ -180,6 +181,59 @@ status:
 		echo "Current: System (original version)"; \
 	else \
 		echo "Current: Unknown (neither build nor backup matches system)"; \
+	fi
+
+upgrade:
+	@set -e; \
+	TARGET_VER="$(VER)"; \
+	if [ -z "$$TARGET_VER" ]; then \
+		TARGET_VER=$$($(SYSTEM_KWIN) --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1); \
+	fi; \
+	if [ -z "$$TARGET_VER" ]; then \
+		echo "Error: could not detect installed kwin version. Run: make upgrade VER=6.7.3"; \
+		exit 1; \
+	fi; \
+	TARGET_TAG="v$$TARGET_VER"; \
+	CURRENT_BASE=$$(git tag --sort=-v:refname --merged HEAD | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$$' | head -1); \
+	if [ -z "$$CURRENT_BASE" ]; then \
+		echo "Error: could not detect current patch base tag."; \
+		exit 1; \
+	fi; \
+	echo "  Current base: $$CURRENT_BASE"; \
+	echo "  Target:       $$TARGET_TAG"; \
+	echo ""; \
+	echo "Fetching upstream tags..."; \
+	git fetch upstream --tags --quiet; \
+	if ! git rev-parse -q --verify "refs/tags/$$TARGET_TAG" >/dev/null 2>&1; then \
+		echo "Error: tag $$TARGET_TAG not found after fetch."; \
+		exit 1; \
+	fi; \
+	INSTALLED=$$($(SYSTEM_KWIN) --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1); \
+	if [ "$$INSTALLED" != "$$TARGET_VER" ]; then \
+		echo "WARNING: target $$TARGET_VER != installed kwin $$INSTALLED"; \
+		echo "  Building against a non-matching tag risks ABI mismatch (the original bug)."; \
+		read -p "Continue anyway? [y/N] " -r < /dev/tty; \
+		if [ "$$REPLY" != "y" ] && [ "$$REPLY" != "Y" ]; then exit 1; fi; \
+		echo ""; \
+	fi; \
+	if [ "$$CURRENT_BASE" = "$$TARGET_TAG" ]; then \
+		echo "Already on $$TARGET_TAG. Nothing to upgrade."; \
+		exit 0; \
+	fi; \
+	echo "Rebasing $$CURRENT_BASE -> $$TARGET_TAG..."; \
+	if git rebase --onto "$$TARGET_TAG" "$$CURRENT_BASE"; then \
+		echo ""; \
+		echo "Upgrade successful: $$CURRENT_BASE -> $$TARGET_TAG"; \
+		echo ""; \
+		echo "Next steps:"; \
+		echo "  make build && make install"; \
+		echo "  (then logout/login to apply)"; \
+	else \
+		echo ""; \
+		echo "CONFLICT during rebase. Resolve, then:"; \
+		echo "  git rebase --continue && make build && make install"; \
+		echo "To abort: git rebase --abort"; \
+		exit 1; \
 	fi
 
 clean:

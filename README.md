@@ -2,7 +2,7 @@
 
 ## The Problem
 When using KDE Plasma, I encountered an issue where scrolling web pages in Firefox is very stuttery, despite my monitor having a high refresh rate (165Hz).
-The root cause (to the best of my knowledge) is the frame pacing mismatch between Kwin and Firefox.
+The root cause (to the best of my knowledge) is the frame pacing mismatch between KWin and Firefox.
 A natural and simple fix is to **enable VRR (Adaptive Sync)** in Display Configuration. There are 2 ways:
 
 1. **Always enable VRR**: the cursor stutters, especially when moving from one window to another.
@@ -37,4 +37,17 @@ make revert
 Check status:
 ```bash
 make status
+```
+
+## Upgrading after a KWin update
+
+When the system kWin is updated (e.g. via the package manager), rebase the patch onto the matching new version tag:
+```bash
+make upgrade                # auto-detects the installed KWin version
+make upgrade VER=6.7.3      # or specify explicitly
+```
+
+After a successful upgrade:
+```bash
+make build && make install
 ```
