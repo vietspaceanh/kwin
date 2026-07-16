@@ -269,8 +269,13 @@ void RenderLoop::scheduleRepaint(Item *item, OutputLayer *outputLayer)
             }
             return false;
         }();
+        const bool isMoveResizeRepaint = [&]() {
+            Window *const window = workspace()->moveResizeWindow();
+            SurfaceItem *const surface = window ? window->surfaceItem() : nullptr;
+            return surface && item && (item == surface || surface->isAncestorOf(item) || item->isAncestorOf(surface));
+        }();
         if (item && surfaceItem && item != surfaceItem && !surfaceItem->isAncestorOf(item) && !item->isAncestorOf(surfaceItem)
-            && activeWindowControlsVrrRefreshRate() && !(effects && effects->hasActiveFullScreenEffect()) && !isCursorRepaint) {
+            && activeWindowControlsVrrRefreshRate() && !(effects && effects->hasActiveFullScreenEffect()) && !isCursorRepaint && !isMoveResizeRepaint) {
             constexpr std::chrono::milliseconds s_delayVrrTimer = 1'000ms / 30;
             d->delayedVrrTimer.start(s_delayVrrTimer, Qt::PreciseTimer, this);
             return;
