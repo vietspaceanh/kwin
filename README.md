@@ -41,10 +41,17 @@ make status
 
 ## Upgrading after a KWin update
 
-When the system kWin is updated (e.g. via the package manager), rebase the patch onto the matching new version tag:
+When the system KWin is updated (e.g. via the package manager), rebase the patch onto the matching new version tag:
 ```bash
 make upgrade                # auto-detects the installed KWin version
 make upgrade VER=6.7.3      # or specify explicitly
+```
+
+`make upgrade` compares sha256 hashes of the installed `kwin_wayland` binary and `libkwin.so` against the backups created by `make install`.
+To bypass the check entirely, use:
+
+```bash
+make force-upgrade  # same as "make upgrade FORCE=1"
 ```
 
 After a successful upgrade:

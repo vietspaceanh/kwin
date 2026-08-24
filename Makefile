@@ -8,7 +8,7 @@ SYSTEM_KWIN := /usr/bin/kwin_wayland
 BACKUP_KWIN := /usr/bin/kwin_wayland.orig
 BACKUP_LIB  := /usr/lib/libkwin.so.orig
 
-.PHONY: build install revert status clean upgrade help
+.PHONY: build install revert status clean upgrade force-upgrade help
 
 help:
 	@echo "KWin Patch Manager"
@@ -17,7 +17,9 @@ help:
 	@echo "  make install  - Install patched KWin (backups original first)"
 	@echo "  make revert   - Restore original system KWin"
 	@echo "  make status   - Show current status"
-	@echo "  make upgrade  - Rebase patch onto new kwin version (usage: make upgrade [VER=6.7.3])"
+	@echo "  make upgrade       - Rebase patch onto new kwin version (usage: make upgrade [VER=6.7.4] [FORCE=1])"
+	@echo "                       Detects rebuilt binaries via sha256 even if version string is unchanged."
+	@echo "  make force-upgrade - Force upgrade even if kwin appears unchanged (same as FORCE=1)"
 	@echo "  make clean    - Remove build directory"
 
 build:
@@ -216,25 +218,56 @@ upgrade:
 		if [ "$$REPLY" != "y" ] && [ "$$REPLY" != "Y" ]; then exit 1; fi; \
 		echo ""; \
 	fi; \
-	if [ "$$CURRENT_BASE" = "$$TARGET_TAG" ]; then \
+	SYS_BIN_HASH=$$(sha256sum $(SYSTEM_KWIN) 2>/dev/null | cut -d' ' -f1); \
+	BACKUP_BIN_HASH=$$(sha256sum $(BACKUP_KWIN) 2>/dev/null | cut -d' ' -f1); \
+	SYS_LIB_REAL_UPGRADE=$$(readlink -f /usr/lib/libkwin.so 2>/dev/null || true); \
+	SYS_LIB_HASH=$$(sha256sum "$$SYS_LIB_REAL_UPGRADE" 2>/dev/null | cut -d' ' -f1); \
+	BACKUP_LIB_HASH=$$(sha256sum $(BACKUP_LIB) 2>/dev/null | cut -d' ' -f1); \
+	CHANGED=0; \
+	if [ -f $(BACKUP_KWIN) ] || [ -f $(BACKUP_LIB) ]; then \
+		if [ "$$SYS_BIN_HASH" != "$$BACKUP_BIN_HASH" ] || [ "$$SYS_LIB_HASH" != "$$BACKUP_LIB_HASH" ]; then \
+			CHANGED=1; \
+		fi; \
+	fi; \
+	if [ "$(FORCE)" = "1" ]; then \
+		CHANGED=1; \
+	fi; \
+	if [ "$$CURRENT_BASE" = "$$TARGET_TAG" ] && [ "$$CHANGED" != "1" ]; then \
 		echo "Already on $$TARGET_TAG. Nothing to upgrade."; \
 		exit 0; \
 	fi; \
-	echo "Rebasing $$CURRENT_BASE -> $$TARGET_TAG..."; \
-	if git rebase --onto "$$TARGET_TAG" "$$CURRENT_BASE"; then \
+	if [ "$$CHANGED" = "1" ] && [ "$$CURRENT_BASE" = "$$TARGET_TAG" ]; then \
+		echo "NOTE: System KWin binaries changed on disk (hash mismatch vs backup)"; \
+		echo "  although version is still $$TARGET_VER."; \
+		echo "  Rebasing is a no-op, but a rebuild+reinstall is needed:"; \
 		echo ""; \
-		echo "Upgrade successful: $$CURRENT_BASE -> $$TARGET_TAG"; \
+	fi; \
+	if [ "$$CURRENT_BASE" = "$$TARGET_TAG" ]; then \
+		echo "Already based on $$TARGET_TAG. No rebase needed."; \
 		echo ""; \
 		echo "Next steps:"; \
 		echo "  make build && make install"; \
 		echo "  (then logout/login to apply)"; \
 	else \
-		echo ""; \
-		echo "CONFLICT during rebase. Resolve, then:"; \
-		echo "  git rebase --continue && make build && make install"; \
-		echo "To abort: git rebase --abort"; \
-		exit 1; \
+		echo "Rebasing $$CURRENT_BASE -> $$TARGET_TAG..."; \
+		if git rebase --onto "$$TARGET_TAG" "$$CURRENT_BASE"; then \
+			echo ""; \
+			echo "Upgrade successful: $$CURRENT_BASE -> $$TARGET_TAG"; \
+			echo ""; \
+			echo "Next steps:"; \
+			echo "  make build && make install"; \
+			echo "  (then logout/login to apply)"; \
+		else \
+			echo ""; \
+			echo "CONFLICT during rebase. Resolve, then:"; \
+			echo "  git rebase --continue && make build && make install"; \
+			echo "To abort: git rebase --abort"; \
+			exit 1; \
+		fi; \
 	fi
+
+force-upgrade:
+	@$(MAKE) --no-print-directory upgrade FORCE=1
 
 clean:
 	rm -rf $(BUILD_DIR)
