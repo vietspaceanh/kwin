@@ -1,49 +1,30 @@
-# KWin
+# KWin VRR frame pacing patches
 
-KWin is an easy to use, but flexible, compositor for Wayland on Linux. Its primary usage is in conjunction with a Desktop Shell (e.g. KDE Plasma Desktop). KWin is designed to go out of the way; users should not notice that they use a window manager at all. Nevertheless KWin provides a steep learning curve for advanced features, which are available, if they do not conflict with the primary mission. KWin does not have a dedicated targeted user group, but follows the targeted user group of the Desktop Shell using KWin as it's window manager.
+Patch set for KWin 6.8.2 that fixes stuttery Firefox scrolling on VRR setups: Firefox does not always deliver a frame every refresh cycle, which shows up as visible stutter while scrolling, and VRR removes that by letting the display follow the client, but compositor-driven animations and cursor updates do not fit the client-paced timing and judder or lag on their own.
 
-## KWin is not...
+## Changes
 
- * a standalone Wayland compositor (c.f. labwc, sway) and does not provide any functionality belonging to a Desktop Shell.
- * a replacement for window managers designed for use with a specific Desktop Shell (e.g. GNOME Shell)
- * a minimalistic window manager
- * designed for use with network transparency, though it is possible (with e.g. waypipe).
+- Disable VRR while a compositor-driven animation runs, covering fullscreen effects and window minimize, unminimize, open and close.
+- Present cursor, interactive move/resize and fullscreen effect updates without the VRR repaint throttle.
 
-# Contributing to KWin
+Changed files: `src/compositor.cpp`, `src/core/renderloop.cpp`, `src/effect/effecthandler.h`, `src/effect/effecthandler.cpp`.
 
-Please refer to the [contributing document](CONTRIBUTING.md) for everything you need to know to get started contributing to KWin.
+## Usage
 
-# Contacting KWin development team
+```bash
+make build && make install   # install, then log out and back in
+make status                  # build, system and backup state
+make revert                  # restore the original KWin
+```
 
- * IRC: #kde-kwin on irc.libera.chat
- * Matrix: [#kwin:kde.org](https://go.kde.org/matrix/#/#kwin:kde.org)
+`make install` backs the original binaries up once, and `/usr/bin/kwin_wayland.orig` and `/usr/lib/libkwin.so.orig` should be refreshed after a package update if `make revert` is to restore that version.
 
-# Support
-## Application Developer
-If you are an application developer having questions regarding windowing systems (either X11 or Wayland) please do not hesitate to contact us.
+## Upgrading
 
-## End user
-Please contact the support channels of your Linux distribution for user support. The KWin development team does not provide end user support.
+```bash
+make upgrade   # rebase onto the installed KWin version
+make build
+make install
+```
 
-# Reporting bugs
-
-Please use [KDE's bugtracker](https://bugs.kde.org) and report for [product KWin](https://bugs.kde.org/enter_bug.cgi?product=kwin).
-
-## Guidelines for new features
-
-A new Feature can only be added to KWin if:
-
- * it does not violate the primary missions as stated at the start of this document
- * it does not introduce instabilities
- * it is maintained, that is bugs are fixed in a timely manner (second next minor release) if it is not a corner case.
- * it works together with all existing features
- * it supports both single and multi screen
- * it adds a significant advantage
- * it is feature complete, that is supports at least all useful features from competitive implementations
- * it is not a special case for a small user group
- * it does not increase code complexity significantly
- * it does not affect KWin's license (GPLv2+)
-
-All new added features are under probation, that is if any of the non-functional requirements as listed above do not hold true in the next two feature releases, the added feature will be removed again.
-
-The same non functional requirements hold true for any kind of plugins (effects, scripts, etc.). It is suggested to use scripted plugins and distribute them separately.
+`make upgrade` only rebases and does not build or install, and since a package update replaces `libkwin.so` with the unpatched build, the patched library has to be reinstalled afterwards even when no rebase was needed.
