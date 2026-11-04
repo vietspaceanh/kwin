@@ -694,6 +694,12 @@ public:
     bool hasActiveFullScreenEffect() const;
 
     /**
+     * Returns true while a window animation (minimize, unminimize, open, close, ...) is
+     * running. Such animations are timed by the compositor rather than by a client.
+     */
+    bool hasActiveAnimation() const;
+
+    /**
      * Returns true if color picker effect is currently picking colors.
      */
     bool isColorPickerActive() const;

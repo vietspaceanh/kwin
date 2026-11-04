@@ -21,6 +21,7 @@
 #include "core/rendertarget.h"
 #include "core/renderviewport.h"
 #include "decorations/decorationbridge.h"
+#include "effect/animationeffect.h"
 #include "effect/effectloader.h"
 #include "effect/offscreenquickview.h"
 #include "effectsadaptor.h"
@@ -459,6 +460,14 @@ Effect *EffectsHandler::activeFullScreenEffect() const
 bool EffectsHandler::hasActiveFullScreenEffect() const
 {
     return fullscreen_effect;
+}
+
+bool EffectsHandler::hasActiveAnimation() const
+{
+    return std::any_of(loaded_effects.cbegin(), loaded_effects.cend(), [](const EffectPair &pair) {
+        const auto animationEffect = qobject_cast<AnimationEffect *>(pair.second);
+        return animationEffect && animationEffect->isActive();
+    });
 }
 
 bool EffectsHandler::isColorPickerActive() const

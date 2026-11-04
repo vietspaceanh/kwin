@@ -6,8 +6,10 @@
 
 #include "renderloop.h"
 #include "backendoutput.h"
+#include "effect/effecthandler.h"
 #include "options.h"
 #include "renderloop_p.h"
+#include "scene/cursoritem.h"
 #include "scene/surfaceitem.h"
 #include "scene/windowitem.h"
 #include "window.h"
@@ -286,9 +288,32 @@ void RenderLoop::scheduleRepaint(Item *item, OutputLayer *outputLayer, std::opti
     }
     const auto surfaceItem = repaintDriver();
     if ((item || outputLayer) && d->output && surfaceItem && item != surfaceItem && (!item || !surfaceItem->isAncestorOf(item))) {
-        constexpr std::chrono::milliseconds s_delayVrrTimer = 1'000ms / 30;
-        d->delayedVrrTimer.start(s_delayVrrTimer, Qt::PreciseTimer, this);
-        return;
+        // With VRR the repaint rate is controlled by the content of the active window. Updates
+        // that are not part of that content must not be throttled though, otherwise they lag
+        // behind it: the cursor would only move at 30 Hz and visibly stutter, especially when
+        // the repaint driver changes as focus moves between windows.
+        const bool isCursorRepaint = [&]() {
+            for (auto *i = item; i; i = i->parentItem()) {
+                if (qobject_cast<CursorItem *>(i)) {
+                    return true;
+                }
+            }
+            return false;
+        }();
+        // The same applies to windows that are being moved or resized interactively; their
+        // decorations and effects are not the repaint driver either.
+        const bool isMoveResizeRepaint = [&]() {
+            Window *const window = workspace()->moveResizeWindow();
+            SurfaceItem *const surface = window ? window->surfaceItem() : nullptr;
+            return surface && item && (item == surface || surface->isAncestorOf(item) || item->isAncestorOf(surface));
+        }();
+        // A fullscreen effect renders on its own schedule, so do not make it wait for a client.
+        if (item && !item->isAncestorOf(surfaceItem) && !(effects && effects->hasActiveFullScreenEffect())
+            && !isCursorRepaint && !isMoveResizeRepaint) {
+            constexpr std::chrono::milliseconds s_delayVrrTimer = 1'000ms / 30;
+            d->delayedVrrTimer.start(s_delayVrrTimer, Qt::PreciseTimer, this);
+            return;
+        }
     }
     d->delayedVrrTimer.stop();
 

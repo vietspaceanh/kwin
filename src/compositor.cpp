@@ -879,7 +879,15 @@ void Compositor::composite(RenderLoop *renderLoop)
     frame->setContentType(activeWindow && activeFullscreenItem ? activeFullscreenItem->contentType() : ContentType::None);
 
     const bool wantsAdaptiveSync = activeWindow && activeWindow->frameGeometry().intersects(primaryView->viewport()) && activeWindow->wantsAdaptiveSync();
-    const bool vrr = (output->capabilities() & BackendOutput::Capability::Vrr) && (output->vrrPolicy() == VrrPolicy::Always || (output->vrrPolicy() == VrrPolicy::Automatic && wantsAdaptiveSync));
+    // Compositor-driven animations (fullscreen effects such as Overview or the desktop grid, but
+    // also window minimize, unminimize, open and close animations) are timed by the compositor
+    // and not by a client. With VRR the panel follows the varying presentation times instead of a
+    // fixed refresh cycle, so a single slow frame stretches the animation and makes it visibly
+    // judder. Present them at a fixed refresh rate instead; this applies to both the Always and
+    // the Automatic policy.
+    const bool compositorAnimation = effects && (effects->hasActiveFullScreenEffect() || effects->hasActiveAnimation());
+    const bool vrr = (output->capabilities() & BackendOutput::Capability::Vrr) && !compositorAnimation
+        && (output->vrrPolicy() == VrrPolicy::Always || (output->vrrPolicy() == VrrPolicy::Automatic && wantsAdaptiveSync));
     const bool tearing = (output->capabilities() & BackendOutput::Capability::Tearing) && options->allowTearing() && activeFullscreenItem && activeWindow->wantsTearing(isTearingRequested(activeFullscreenItem));
     if (vrr) {
         frame->setPresentationMode(tearing ? PresentationMode::AdaptiveAsync : PresentationMode::AdaptiveSync);
